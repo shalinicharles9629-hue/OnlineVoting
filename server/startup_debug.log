@@ -1,0 +1,11 @@
+[dotenv@17.2.4] injecting env (9) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+Server: Starting initialization...
+Server: CORS initialized
+Server: JSON parser initialized
+Server: Static routes initialized
+Server: Importing routes...
+Chatbot: GEMINI_API_KEY found, initializing Gemini 1.5 Flash...
+Server: Routes imported successfully
+Server running on port 5000
+MongoDB connected
+^C

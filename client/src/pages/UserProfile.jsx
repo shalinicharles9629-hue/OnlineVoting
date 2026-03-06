@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 const UserProfile = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
 
     if (!user) {
-        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+        return <div className="min-h-screen flex items-center justify-center">{t('profile.loading')}</div>;
     }
 
     return (
@@ -34,7 +36,7 @@ const UserProfile = () => {
                                 <p className="text-gray-500 font-medium">{user.email}</p>
                             </div>
                             <span className="mt-2 md:mt-0 bg-blue-100 text-gov-blue px-4 py-1 rounded-full text-sm font-bold uppercase tracking-wide border border-blue-200">
-                                {user.role} Account
+                                {user.role} {t('profile.account')}
                             </span>
                         </div>
 
@@ -42,38 +44,38 @@ const UserProfile = () => {
 
                         <div className="grid md:grid-cols-2 gap-8">
                             <div>
-                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Personal Information</h3>
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">{t('profile.personal_info')}</h3>
                                 <div className="space-y-4">
                                     <div>
-                                        <p className="text-xs text-gray-500">Voter ID</p>
+                                        <p className="text-xs text-gray-500">{t('profile.voter_id')}</p>
                                         <p className="text-lg font-semibold text-gray-800">{user._id?.substring(0, 10).toUpperCase() || "N/A"}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500">Date of Registration</p>
+                                        <p className="text-xs text-gray-500">{t('profile.reg_date')}</p>
                                         <p className="text-lg font-semibold text-gray-800">{new Date().toLocaleDateString()}</p>
                                     </div>
                                     <div>
-                                        <p className="text-xs text-gray-500">Address</p>
-                                        <p className="text-lg font-semibold text-gray-800">Assigned Constituency</p>
+                                        <p className="text-xs text-gray-500">{t('profile.address')}</p>
+                                        <p className="text-lg font-semibold text-gray-800">{t('profile.constituency')}</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Voting Status</h3>
+                                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">{t('profile.voting_status')}</h3>
                                 <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
                                     <div className="flex items-center gap-4 mb-4">
                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${user.hasVoted ? 'bg-green-500' : 'bg-yellow-500'}`}>
                                             {user.hasVoted ? '✓' : '!'}
                                         </div>
                                         <div>
-                                            <p className="font-bold text-gray-800">{user.hasVoted ? 'Vote Cast' : 'Vote Pending'}</p>
-                                            <p className="text-sm text-gray-500">{user.hasVoted ? 'You have successfully voted in the current election.' : 'Please cast your vote before the deadline.'}</p>
+                                            <p className="font-bold text-gray-800">{user.hasVoted ? t('profile.vote_cast') : t('profile.vote_pending')}</p>
+                                            <p className="text-sm text-gray-500">{user.hasVoted ? t('profile.voted_desc') : t('profile.pending_desc')}</p>
                                         </div>
                                     </div>
                                     {!user.hasVoted && (
                                         <Link to="/dashboard" className="block w-full bg-gov-orange text-white py-2 rounded-lg font-bold shadow-md hover:bg-orange-600 transition text-center">
-                                            Go to Voting Booth
+                                            {t('profile.booth_btn')}
                                         </Link>
                                     )}
                                 </div>

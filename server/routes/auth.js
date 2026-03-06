@@ -4,10 +4,11 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const Vote = require('../models/Vote');
 const Election = require('../models/Election');
 const VoterOTP = require('../models/VoterOTP');
+const { sendOTPEmail } = require('../utils/emailService');
+
 
 // Helper to check vote status
 async function getUserWithVoteStatus(user) {
@@ -18,7 +19,10 @@ async function getUserWithVoteStatus(user) {
         let hasVoted = false;
         if (ongoingElectionIds.length > 0) {
             const vote = await Vote.findOne({
-                voterId: user._id,
+                $or: [
+                    { voterIdentifier: user.email },
+                    { voterIdentifier: user.phone }
+                ],
                 electionId: { $in: ongoingElectionIds }
             });
             hasVoted = !!vote;
@@ -106,16 +110,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Configure Nodemailer Logic
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+
 
 // Send OTP (For Login OR Registration)
 router.post('/send-otp', async (req, res) => {
@@ -146,18 +141,7 @@ router.post('/send-otp', async (req, res) => {
         const targetEmail = user.email;
 
         if (targetEmail) {
-            try {
-                await transporter.sendMail({
-                    from: process.env.EMAIL_FROM,
-                    to: targetEmail,
-                    subject: 'Your Election OTP',
-                    text: `Your OTP is ${otp}. It is valid for 10 minutes.`
-                });
-                console.log(`[OTP] Email sent to ${targetEmail}`);
-            } catch (emailError) {
-                console.error("Error sending email:", emailError);
-                return res.status(500).json({ error: 'Failed to send OTP email' });
-            }
+            await sendOTPEmail(targetEmail, otp);
         } else {
             // SMS logic for phone
             console.log(`[OTP] for ${identifier}: ${otp}`);

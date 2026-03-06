@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AdminLayout from '../components/AdminLayout';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,21 +18,63 @@ const AdminVoters = () => {
     const [photo, setPhoto] = useState(null);
     const [photoPreview, setPhotoPreview] = useState(null);
     const [error, setError] = useState('');
+    const [repairingId, setRepairingId] = useState(null);
+    const [lastUpdated, setLastUpdated] = useState(null);
+
+    const handleRepairBiometrics = async (voter) => {
+        if (!voter.photo) return;
+        setRepairingId(voter._id);
+
+        try {
+            // 1. Load the existing image
+            const imgUrl = `http://localhost:5000${voter.photo}`;
+            const img = await faceapi.fetchImage(imgUrl);
+
+            // 2. Perform detection
+            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detection) {
+                alert('No face detected in the profile photo. Please upload a new one.');
+                return;
+            }
+
+            // 3. Update backend
+            const token = localStorage.getItem('token');
+            const res = await axios.patch(`http://localhost:5000/api/admin/voters/${voter._id}/biometrics`, {
+                faceDescriptor: JSON.stringify(Array.from(detection.descriptor))
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            // 4. Update state
+            setVoters(voters.map(v => v._id === voter._id ? res.data : v));
+            alert(`Biometrics successfully repaired for ${voter.name}!`);
+        } catch (err) {
+            console.error('Repair failed:', err);
+            alert('Failed to repair biometrics: ' + (err.response?.data?.error || err.message));
+        } finally {
+            setRepairingId(null);
+        }
+    };
+
+    const fetchVoters = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get('http://localhost:5000/api/admin/voters', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setVoters(res.data);
+            setLastUpdated(new Date());
+            setLoading(false);
+        } catch (error) {
+            console.error('Error fetching voters:', error);
+            setLoading(false);
+        }
+    }, []);
 
     useEffect(() => {
-        const fetchVoters = async () => {
-            try {
-                const token = localStorage.getItem('token');
-                const res = await axios.get('http://localhost:5000/api/admin/voters', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setVoters(res.data);
-                setLoading(false);
-            } catch (error) {
-                console.error('Error fetching voters:', error);
-                setLoading(false);
-            }
-        };
         fetchVoters();
 
         const loadModels = async () => {
@@ -49,7 +91,16 @@ const AdminVoters = () => {
             }
         };
         loadModels();
-    }, []);
+
+        // Polling every 60 seconds to keep status updated
+        const interval = setInterval(fetchVoters, 60000);
+        return () => clearInterval(interval);
+    }, [fetchVoters]);
+
+    const refreshData = () => {
+        setLoading(true);
+        fetchVoters();
+    };
 
     const handlePhotoChange = (e) => {
         const file = e.target.files[0];
@@ -72,7 +123,7 @@ const AdminVoters = () => {
         try {
             // 1. Generate Face Descriptor from uploaded photo
             const img = await faceapi.bufferToImage(photo);
-            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
                 .withFaceLandmarks()
                 .withFaceDescriptor();
 
@@ -122,13 +173,27 @@ const AdminVoters = () => {
                 <div className="flex items-center gap-4">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Voter Registry</h1>
-                        <p className="text-gray-500">View and manage all enrolled voters with biometric data.</p>
+                        <p className="text-gray-500">
+                            View and manage all enrolled voters.
+                            {lastUpdated && (
+                                <span className="ml-2 text-xs text-gov-blue">
+                                    Last synced: {lastUpdated.toLocaleTimeString()}
+                                </span>
+                            )}
+                        </p>
                     </div>
                     <button
                         onClick={() => setShowModal(true)}
                         className="bg-gov-blue text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-800 transition shadow-lg flex items-center gap-2"
                     >
                         <span>➕</span> Add Voter
+                    </button>
+                    <button
+                        onClick={refreshData}
+                        className="bg-white text-gov-blue border-2 border-gov-blue px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition shadow-sm flex items-center gap-2"
+                        title="Refresh Voter Status"
+                    >
+                        <span>🔄</span> Refresh
                     </button>
                 </div>
                 <div className="relative group w-full md:w-96">
@@ -151,7 +216,8 @@ const AdminVoters = () => {
                                 <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-gray-400">Voter Profile</th>
                                 <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-gray-400">Contact Details</th>
                                 <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-gray-400">Enrollment Date</th>
-                                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-gray-400">Status</th>
+                                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-gray-400">Voting Status</th>
+                                <th className="px-8 py-5 text-xs font-black uppercase tracking-widest text-gray-400">Biometric Status</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -162,11 +228,12 @@ const AdminVoters = () => {
                                         <td className="px-8 py-6"><div className="h-4 bg-gray-100 w-48 rounded"></div></td>
                                         <td className="px-8 py-6"><div className="h-4 bg-gray-100 w-24 rounded"></div></td>
                                         <td className="px-8 py-6"><div className="h-4 bg-gray-100 w-20 rounded"></div></td>
+                                        <td className="px-8 py-6"><div className="h-4 bg-gray-100 w-20 rounded"></div></td>
                                     </tr>
                                 ))
                             ) : filteredVoters.length === 0 ? (
                                 <tr>
-                                    <td colSpan="4" className="px-8 py-20 text-center text-gray-500 font-medium">No voters found.</td>
+                                    <td colSpan="5" className="px-8 py-20 text-center text-gray-500 font-medium">No voters found.</td>
                                 </tr>
                             ) : (
                                 filteredVoters.map((voter) => (
@@ -203,10 +270,27 @@ const AdminVoters = () => {
                                             </p>
                                         </td>
                                         <td className="px-8 py-6">
-                                            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${voter.faceDescriptor?.length > 0 ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${voter.faceDescriptor?.length > 0 ? 'bg-green-600' : 'bg-red-600'}`}></span>
-                                                {voter.faceDescriptor?.length > 0 ? 'Biometrics Active' : 'No Face Data'}
+                                            <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${voter.hasVoted ? 'bg-green-50 text-green-600 border-green-100' : 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${voter.hasVoted ? 'bg-green-600' : 'bg-gray-400'}`}></span>
+                                                {voter.hasVoted ? 'Voted' : 'Not Voted'}
                                             </span>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex flex-col gap-2">
+                                                <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${voter.faceDescriptor?.length > 0 ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${voter.faceDescriptor?.length > 0 ? 'bg-green-600' : 'bg-red-600'}`}></span>
+                                                    {voter.faceDescriptor?.length > 0 ? 'Biometrics Active' : 'No Face Data'}
+                                                </span>
+                                                {(!voter.faceDescriptor || voter.faceDescriptor.length === 0) && voter.photo && (
+                                                    <button
+                                                        onClick={() => handleRepairBiometrics(voter)}
+                                                        disabled={repairingId === voter._id}
+                                                        className="text-[10px] font-bold text-gov-orange hover:underline text-left uppercase tracking-tighter disabled:opacity-50"
+                                                    >
+                                                        {repairingId === voter._id ? 'Repairing...' : '🛠 Repair Data'}
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </motion.tr>
                                 ))

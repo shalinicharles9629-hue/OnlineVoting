@@ -2,8 +2,11 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from './LanguageSelector';
 
 const Navbar = () => {
+    const { t } = useTranslation();
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
@@ -16,18 +19,14 @@ const Navbar = () => {
     };
 
     const navLinks = [
-        { name: 'Home', path: '/' },
-        { name: 'About', path: '/about' },
-        { name: 'Contact', path: '/contact' },
-        ...(user ? [
-            { name: 'Dashboard', path: '/dashboard' },
-        ] : []),
+        { name: t('nav.home'), path: '/' },
+        { name: t('nav.dashboard'), path: '/dashboard' },
     ];
 
     const isActive = (path) => location.pathname === path;
 
     return (
-        <nav className="glass">
+        <nav className="glass relative z-[60]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16 items-center">
                     {/* Logo */}
@@ -37,7 +36,7 @@ const Navbar = () => {
                         </div>
                         <div className="flex flex-col">
                             <span className="text-xl font-bold text-gov-blue leading-none group-hover:text-gov-orange transition-colors">VoteOnline</span>
-                            <span className="text-xs text-gray-500 font-medium tracking-wide">GOVT. OF INDIA</span>
+                            <span className="text-xs text-gray-500 font-medium tracking-wide">{t('nav.govt_india')}</span>
                         </div>
                     </Link>
 
@@ -57,11 +56,12 @@ const Navbar = () => {
                         ))}
 
                         {user && user.role === 'admin' && (
-                            <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-red-400">ADMIN</span>
+                            <span className="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded border border-red-400">{t('nav.admin')}</span>
                         )}
 
                         {user ? (
                             <div className="flex items-center gap-4">
+                                <LanguageSelector />
                                 <Link to="/profile" className="flex items-center gap-2 hover:bg-gray-100 p-1 rounded-full transition pr-3">
                                     <div className="w-8 h-8 bg-gov-orange rounded-full flex items-center justify-center text-white text-sm font-bold">
                                         {user.name.charAt(0).toUpperCase()}
@@ -72,16 +72,17 @@ const Navbar = () => {
                                     onClick={handleLogout}
                                     className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-full text-sm font-semibold transition"
                                 >
-                                    Logout
+                                    {t('nav.logout')}
                                 </button>
                             </div>
                         ) : (
                             <div className="flex items-center gap-3">
+                                <LanguageSelector />
                                 <Link to="/admin/login" className="text-gov-blue font-semibold hover:underline text-sm hover:text-blue-800 transition-colors">
-                                    Admin Portal
+                                    {t('nav.admin')}
                                 </Link>
                                 <Link to="/candidate/login" className="bg-gov-orange hover:bg-orange-700 text-white px-5 py-2 rounded-full text-sm font-semibold shadow-md transition-all transform hover:scale-105">
-                                    Candidate Login
+                                    {t('home.nomination_card.login_btn')}
                                 </Link>
                             </div>
                         )}
@@ -137,18 +138,22 @@ const Navbar = () => {
                                         : 'text-gray-700 hover:text-gov-blue hover:bg-gray-50'
                                         }`}
                                 >
-                                    My Profile
+                                    {t('nav.my_profile')}
                                 </Link>
                             )}
 
-                            <div className="pt-4 border-t border-gray-100 mt-2">
+                            <div className="pt-4 border-t border-gray-100 mt-2 flex flex-col gap-4">
+                                <div className="flex justify-between items-center px-3">
+                                    <span className="text-sm font-medium text-gray-500">{t('nav.language_label')}</span>
+                                    <LanguageSelector />
+                                </div>
                                 {!user ? (
                                     <Link to="/register" onClick={() => setIsOpen(false)} className="block w-full text-center bg-gov-orange text-white px-3 py-2 rounded-lg font-bold shadow-md">
-                                        Register Now
+                                        {t('nav.register_now')}
                                     </Link>
                                 ) : (
                                     <button onClick={handleLogout} className="block w-full text-center bg-gray-100 text-red-600 px-3 py-2 rounded-lg font-bold">
-                                        Logout
+                                        {t('nav.logout')}
                                     </button>
                                 )}
                             </div>

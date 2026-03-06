@@ -4,14 +4,19 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
+import SuccessModal from '../components/SuccessModal';
+import { useTranslation } from 'react-i18next';
+import { savePendingVote } from '../utils/offlineStorage';
 
 const Vote = () => {
+    const { t } = useTranslation();
     const { electionId } = useParams();
     const navigate = useNavigate();
     const webcamRef = useRef(null);
     const [candidates, setCandidates] = useState([]);
     const [selectedCandidate, setSelectedCandidate] = useState(null);
     const [showModal, setShowModal] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     // Flow State: 1: Enter ID, 2: Enter OTP, 3: Face Recognition
     const [flowStep, setFlowStep] = useState(1);
@@ -19,6 +24,7 @@ const Vote = () => {
     const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
     const [voterData, setVoterData] = useState(null);
+    const [isOfflineVote, setIsOfflineVote] = useState(false);
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [faceMatched, setFaceMatched] = useState(false);
     const [matchError, setMatchError] = useState('');
@@ -53,7 +59,7 @@ const Vote = () => {
     }, [electionId]);
 
     const handleSendOTP = async () => {
-        if (!identifier) return alert("Please enter your Email or Phone");
+        if (!identifier) return alert(t('vote.email_alert'));
         setLoading(true);
         try {
             await axios.post('http://localhost:5000/api/votes/send-otp', {
@@ -62,14 +68,14 @@ const Vote = () => {
             });
             setFlowStep(2);
         } catch (error) {
-            alert(error.response?.data?.message || "Failed to send OTP");
+            alert(error.response?.data?.message || t('login.otp_fail'));
         } finally {
             setLoading(false);
         }
     };
 
     const handleVerifyOTP = async () => {
-        if (!otp) return alert("Please enter the OTP");
+        if (!otp) return alert(t('vote.otp_alert'));
         setLoading(true);
         try {
             const res = await axios.post('http://localhost:5000/api/votes/verify-otp', {
@@ -79,7 +85,7 @@ const Vote = () => {
             setVoterData(res.data);
             setFlowStep(3);
         } catch (error) {
-            alert(error.response?.data?.message || "Verification failed");
+            alert(error.response?.data?.message || t('login.invalid_otp'));
         } finally {
             setLoading(false);
         }
@@ -90,7 +96,7 @@ const Vote = () => {
 
         const video = webcamRef.current.video;
         if (video.readyState !== 4) {
-            setMatchError("Camera not ready. Please look at the lens.");
+            setMatchError(t('vote.camera_not_ready'));
             return;
         }
 
@@ -102,23 +108,24 @@ const Vote = () => {
                 .withFaceDescriptor();
 
             if (!detection) {
-                setMatchError("No face detected. Please position yourself correctly.");
+                setMatchError(t('voter_register.face_required'));
                 setLoading(false);
                 return;
             }
 
             const storedDescriptor = new Float32Array(voterData.faceDescriptor);
             const distance = faceapi.euclideanDistance(detection.descriptor, storedDescriptor);
+            console.log("Face distance:", distance);
 
-            if (distance < 0.6) { // Threshold for match
+            if (distance < 0.7) { // Increased threshold from 0.6 to 0.7
                 setFaceMatched(true);
                 handleCastVote();
             } else {
-                setMatchError("Face mismatch! Access denied.");
+                setMatchError(t('vote.mismatch', { distance: distance.toFixed(3) }));
             }
         } catch (err) {
             console.error(err);
-            setMatchError("Error during face recognition.");
+            setMatchError(t('vote.face_error'));
         } finally {
             setLoading(false);
         }
@@ -126,17 +133,28 @@ const Vote = () => {
 
     const handleCastVote = async () => {
         setLoading(true);
+        const voteData = {
+            identifier,
+            otp,
+            electionId,
+            candidateId: selectedCandidate
+        };
+
         try {
-            await axios.post('http://localhost:5000/api/votes/verify-and-cast', {
-                identifier,
-                otp,
-                electionId,
-                candidateId: selectedCandidate
-            });
-            alert("Vote cast successfully! Verification complete.");
-            navigate(`/results/${electionId}`);
+            if (!navigator.onLine) {
+                await savePendingVote(voteData);
+                setIsOfflineVote(true);
+                setShowModal(false);
+                setShowSuccess(true);
+                return;
+            }
+
+            await axios.post('http://localhost:5000/api/votes/verify-and-cast', voteData);
+            setIsOfflineVote(false);
+            setShowModal(false);
+            setShowSuccess(true);
         } catch (error) {
-            alert(error.response?.data?.message || "Failed to cast vote");
+            alert(error.response?.data?.message || t('login.invalid_credentials'));
         } finally {
             setLoading(false);
         }
@@ -153,9 +171,9 @@ const Vote = () => {
     return (
         <div className="min-h-screen bg-gov-bg p-6 md:p-12">
             <div className="container mx-auto max-w-5xl">
-                <div className="text-center mb-12">
-                    <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Digital Ballot Box</h1>
-                    <p className="text-gray-500 mt-2">Verified Voting through 2-Layer Security (OTP + FaceID)</p>
+                <div className="text-center mb-12 relative">
+                    <h1 className="text-3xl font-bold text-gray-800 tracking-tight">{t('vote.ballot_box')}</h1>
+                    <p className="text-gray-500 mt-2">{t('vote.security_subtitle')}</p>
                     <div className="w-24 h-1.5 bg-gov-orange mx-auto rounded-full mt-4"></div>
                 </div>
 
@@ -175,7 +193,7 @@ const Vote = () => {
                                 )}
                                 <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md rounded-2xl p-2 shadow-lg w-16 h-16 flex flex-col items-center justify-center text-center border border-gray-100">
                                     <span className="text-3xl leading-none">{getSymbolIcon(candidate.symbol)}</span>
-                                    <span className="text-[10px] font-black uppercase mt-1 text-gray-800">{candidate.symbol || 'IND'}</span>
+                                    <span className="text-[10px] font-black uppercase mt-1 text-gray-800">{candidate.symbol || t('vote.ind')}</span>
                                 </div>
                             </div>
                             <div className="p-6 text-center">
@@ -197,7 +215,7 @@ const Vote = () => {
                         onClick={() => setShowModal(true)}
                         className={`px-12 py-4 rounded-full font-bold text-lg shadow-2xl transition-all transform ${selectedCandidate ? 'bg-gov-blue hover:bg-blue-800 text-white hover:-translate-y-1' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                     >
-                        Proceed to Verify
+                        {t('vote.proceed_verify')}
                     </button>
 
                 </div>
@@ -228,14 +246,14 @@ const Vote = () => {
                                 </div>
 
                                 <h3 className="text-2xl font-black text-gray-900 mb-2">
-                                    {flowStep === 1 ? 'Voter Identity' : flowStep === 2 ? 'OTP Verification' : 'Face Verification'}
+                                    {flowStep === 1 ? t('vote.voter_identity') : flowStep === 2 ? t('vote.otp_verification') : t('vote.face_verification')}
                                 </h3>
 
                                 {flowStep === 1 && (
                                     <div className="space-y-4 mt-6">
                                         <input
                                             type="text"
-                                            placeholder="Email or Phone Number"
+                                            placeholder={t('login.email_label')}
                                             value={identifier}
                                             onChange={(e) => setIdentifier(e.target.value)}
                                             className="w-full px-6 py-4 rounded-2xl bg-gray-50 border border-gray-200 focus:border-gov-blue outline-none font-medium"
@@ -245,7 +263,7 @@ const Vote = () => {
                                             disabled={loading || !identifier}
                                             className="w-full py-4 bg-gov-blue text-white rounded-2xl font-bold shadow-xl disabled:opacity-50"
                                         >
-                                            {loading ? 'Sending...' : 'Send OTP'}
+                                            {loading ? t('login.sending_otp') : t('login.send_otp')}
                                         </button>
                                     </div>
                                 )}
@@ -254,7 +272,7 @@ const Vote = () => {
                                     <div className="space-y-4 mt-6">
                                         <input
                                             type="text"
-                                            placeholder="Enter 6-digit OTP"
+                                            placeholder={t('voter_register.enter_otp')}
                                             maxLength="6"
                                             value={otp}
                                             onChange={(e) => setOtp(e.target.value)}
@@ -265,7 +283,7 @@ const Vote = () => {
                                             disabled={loading || otp.length < 6}
                                             className="w-full py-4 bg-gov-orange text-white rounded-2xl font-bold shadow-xl disabled:opacity-50"
                                         >
-                                            {loading ? 'Verifying...' : 'Next Step'}
+                                            {loading ? t('login.verifying') : t('vote.next_step')}
                                         </button>
                                     </div>
                                 )}
@@ -282,7 +300,7 @@ const Vote = () => {
                                             {!cameraReady && (
                                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white z-20">
                                                     <div className="w-10 h-10 border-4 border-gov-blue border-t-transparent rounded-full animate-spin mb-4"></div>
-                                                    <p className="text-sm font-bold">Activating Camera...</p>
+                                                    <p className="text-sm font-bold">{t('voter_register.activating_camera')}</p>
                                                 </div>
                                             )}
                                             {faceMatched && (
@@ -292,26 +310,32 @@ const Vote = () => {
                                             )}
                                         </div>
                                         {matchError && <p className="text-red-500 text-sm font-bold">{matchError}</p>}
-                                        <p className="text-sm text-gray-500">Hello {voterData?.name}, please look at the camera to verify your identity.</p>
+                                        <p className="text-sm text-gray-500">{t('vote.match_facing', { name: voterData?.name })}</p>
                                         <button
                                             onClick={verifyFace}
                                             disabled={loading || !modelsLoaded || faceMatched}
                                             className="w-full py-4 bg-gov-blue text-white rounded-2xl font-bold shadow-xl disabled:opacity-50"
                                         >
-                                            {loading ? 'Analyzing...' : 'Match Face & Vote'}
+                                            {loading ? t('vote.analyzing') : t('vote.match_vote_btn')}
                                         </button>
                                     </div>
                                 )}
 
                                 <div className="mt-8 pt-6 border-t border-gray-100">
                                     <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">
-                                        Secure Biometric Voting Layer
+                                        {t('vote.biometric_layer')}
                                     </p>
                                 </div>
                             </motion.div>
                         </motion.div>
                     )}
                 </AnimatePresence>
+
+                <SuccessModal
+                    isOpen={showSuccess}
+                    isOffline={isOfflineVote}
+                    onClose={() => navigate('/')}
+                />
             </div>
         </div>
     );

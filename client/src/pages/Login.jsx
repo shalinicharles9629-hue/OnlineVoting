@@ -3,8 +3,11 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
+
 
 const Login = () => {
+    const { t } = useTranslation();
     const [loginMethod, setLoginMethod] = useState('password'); // 'password' or 'otp'
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -29,7 +32,7 @@ const Login = () => {
         try {
             const res = await login(email, password);
             if (res.user.role !== 'voter' && res.user.role !== 'candidate') {
-                setError('Role mismatch. Please use the appropriate portal for login.');
+                setError(t('login.role_mismatch'));
                 return;
             }
             const redirectPath = searchParams.get('redirect');
@@ -50,9 +53,9 @@ const Login = () => {
             await axios.post('http://localhost:5000/api/auth/send-otp', { identifier });
             setOtpSent(true);
             setOtpStep(2);
-            setSuccessMessage(`OTP sent to ${identifier}`);
+            setSuccessMessage(`${t('login.enter_otp')} ${identifier}`);
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to send OTP. Please check your email/phone.');
+            setError(err.response?.data?.error || t('login.otp_fail'));
         } finally {
             setLoading(false);
         }
@@ -65,13 +68,13 @@ const Login = () => {
         try {
             const res = await verifyOtpAndLogin(identifier, otp);
             if (res.user.role !== 'voter' && res.user.role !== 'candidate') {
-                setError('Role mismatch. Please use the appropriate portal for login.');
+                setError(t('login.role_mismatch'));
                 return;
             }
             const redirectPath = searchParams.get('redirect');
             navigate(redirectPath || '/dashboard');
         } catch (err) {
-            setError(err.response?.data?.error || 'Invalid OTP');
+            setError(err.response?.data?.error || t('login.invalid_otp'));
         } finally {
             setLoading(false);
         }
@@ -93,9 +96,9 @@ const Login = () => {
                             <span className="text-6xl">🇮🇳</span>
                         </div>
                     </motion.div>
-                    <h2 className="text-4xl font-bold mb-4">Voter Portal</h2>
+                    <h2 className="text-4xl font-bold mb-4">{t('login.voter_portal')}</h2>
                     <p className="text-blue-200 text-lg">
-                        Exercise your democratic right. Securely access your ballot and cast your vote.
+                        {t('login.exercise_right')}
                     </p>
                 </div>
             </div>
@@ -111,8 +114,8 @@ const Login = () => {
                     className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md border border-gray-100"
                 >
                     <div className="text-center mb-6">
-                        <h2 className="text-3xl font-bold text-gray-800">Voter Login</h2>
-                        <p className="text-gray-500 mt-2">Enter your citizen credentials</p>
+                        <h2 className="text-3xl font-bold text-gray-800">{t('login.voter_login')}</h2>
+                        <p className="text-gray-500 mt-2">{t('login.enter_credentials')}</p>
                     </div>
 
                     {/* Login Method Toggle */}
@@ -124,7 +127,7 @@ const Login = () => {
                                 : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
-                            Password
+                            {t('login.password_tab')}
                         </button>
                         <button
                             onClick={() => setLoginMethod('otp')}
@@ -133,7 +136,7 @@ const Login = () => {
                                 : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
-                            OTP Login
+                            {t('login.otp_tab')}
                         </button>
                     </div>
 
@@ -152,7 +155,7 @@ const Login = () => {
                     {loginMethod === 'password' ? (
                         <form onSubmit={handlePasswordLogin} className="space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.email_label')}</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-3 text-gray-400">✉️</span>
                                     <input
@@ -166,7 +169,7 @@ const Login = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.password_label')}</label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-3 text-gray-400">🔒</span>
                                     <input
@@ -184,7 +187,7 @@ const Login = () => {
                                 disabled={loading}
                                 className="w-full bg-gov-orange hover:bg-orange-600 text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50"
                             >
-                                {loading ? 'Signing In...' : 'Sign In'}
+                                {loading ? t('login.signing_in') : t('login.signin_btn')}
                             </button>
                         </form>
                     ) : (
@@ -192,13 +195,13 @@ const Login = () => {
                             {otpStep === 1 ? (
                                 <form onSubmit={handleSendOTP} className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">Email or Phone Number</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.identifier_label')}</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-3 text-gray-400">📱</span>
                                             <input
                                                 type="text"
                                                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gov-blue focus:border-transparent outline-none transition text-gray-900"
-                                                placeholder="Enter Email or Phone"
+                                                placeholder={t('login.identifier_placeholder')}
                                                 value={identifier}
                                                 onChange={(e) => setIdentifier(e.target.value)}
                                                 required
@@ -210,23 +213,23 @@ const Login = () => {
                                         disabled={loading}
                                         className="w-full bg-gov-blue hover:bg-blue-800 text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50"
                                     >
-                                        {loading ? 'Sending OTP...' : 'Send OTP'}
+                                        {loading ? t('login.sending_otp') : t('login.send_otp')}
                                     </button>
                                 </form>
                             ) : (
                                 <form onSubmit={handleVerifyOTP} className="space-y-6">
                                     <div className="text-center mb-2">
-                                        <p className="text-sm text-gray-600">Enter OTP sent to <span className="font-semibold">{identifier}</span></p>
+                                        <p className="text-sm text-gray-600">{t('login.enter_otp')} <span className="font-semibold">{identifier}</span></p>
                                         <button
                                             type="button"
                                             onClick={() => setOtpStep(1)}
                                             className="text-xs text-gov-blue hover:underline mt-1"
                                         >
-                                            Change Number/Email
+                                            {t('login.change_identifier')}
                                         </button>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">One Time Password (OTP)</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">{t('login.otp_label')}</label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-3 text-gray-400">🔑</span>
                                             <input
@@ -245,7 +248,7 @@ const Login = () => {
                                         disabled={loading}
                                         className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5 disabled:opacity-50"
                                     >
-                                        {loading ? 'Verifying...' : 'Verify & Login'}
+                                        {loading ? t('login.verifying') : t('login.verify_login')}
                                     </button>
                                 </form>
                             )}
@@ -253,9 +256,9 @@ const Login = () => {
                     )}
 
                     <p className="mt-8 text-center text-sm text-gray-600">
-                        Interested in standing for election?{' '}
+                        {t('login.apply_candidate_prompt').split('? ')[0]}?{' '}
                         <Link to="/register" className="font-semibold text-gov-blue hover:text-blue-800 transition">
-                            Apply as Candidate
+                            {t('login.apply_candidate_prompt').split('? ')[1]}
                         </Link>
                     </p>
                 </motion.div>

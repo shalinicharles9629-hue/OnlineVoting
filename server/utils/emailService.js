@@ -147,6 +147,9 @@ const sendRejectionEmail = async (candidateEmail, candidateName, rejectionReason
 
 const sendOTPEmail = async (email, otp) => {
     try {
+        // ALWAYS log OTP to console as a fallback for the user/admin
+        console.log(`[OTP FALLBACK] The OTP for ${email} is: ${otp}`);
+
         const transporter = createTransporter();
         const mailOptions = {
             from: process.env.EMAIL_FROM || '"Election Commission" <noreply@elections.gov.in>',
@@ -171,9 +174,11 @@ const sendOTPEmail = async (email, otp) => {
             `
         };
         await transporter.sendMail(mailOptions);
+        console.log(`[OTP] Email sent successfully to ${email}`);
         return { success: true };
     } catch (error) {
-        console.error('Error sending OTP email:', error);
+        console.error('Error sending OTP email:', error.message);
+        // We return success: false BUT the user can still see the OTP in the console log above
         return { success: false, error: error.message };
     }
 };

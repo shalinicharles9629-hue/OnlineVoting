@@ -4,8 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
+import { useTranslation } from 'react-i18next';
+
 
 const VoterRegister = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const webcamRef = useRef(null);
     const [loading, setLoading] = useState(false);
@@ -36,7 +39,7 @@ const VoterRegister = () => {
                 setModelsLoaded(true);
             } catch (err) {
                 console.error("Error loading models:", err);
-                setError("Face recognition system is preparing. Please wait...");
+                setError(t('voter_register.preparing_models'));
                 // Retry loading after 3 seconds if failed
                 setTimeout(loadModels, 3000);
             }
@@ -45,33 +48,33 @@ const VoterRegister = () => {
     }, []);
 
     const handleSendOTP = async () => {
-        if (!identifier) return setError("Identifier is required");
+        if (!identifier) return setError(t('voter_register.id_required'));
         setLoading(true);
         setError('');
         try {
             await axios.post('http://localhost:5000/api/auth/send-otp', { identifier });
             setOtpSent(true);
         } catch (err) {
-            setError(err.response?.data?.error || "Failed to send OTP. Ensure server is running.");
+            setError(err.response?.data?.error || t('login.otp_fail'));
         } finally {
             setLoading(false);
         }
     };
 
     const handleVerifyOTP = async () => {
-        if (!otp) return setError("OTP is required");
+        if (!otp) return setError(t('voter_register.enter_otp'));
         setLoading(true);
         setError('');
         try {
             const res = await axios.post('http://localhost:5000/api/auth/verify-otp', { identifier, otp });
             if (res.data.exists) {
-                alert("You are already registered! Redirecting to vote...");
+                alert(t('voter_register.already_registered'));
                 navigate('/');
             } else {
                 setStep(2);
             }
         } catch (err) {
-            setError(err.response?.data?.error || "Verification failed");
+            setError(err.response?.data?.error || t('login.invalid_otp'));
         } finally {
             setLoading(false);
         }
@@ -120,12 +123,12 @@ const VoterRegister = () => {
             setCapturedImage(imageSrc);
             setFaceDescriptor(Array.from(detection.descriptor));
         } else {
-            setError("No face detected. Please position yourself clearly.");
+            setError(t('voter_register.face_required'));
         }
     };
 
     const handleSubmit = async () => {
-        if (!name || !capturedImage || !faceDescriptor) return setError("All fields are required");
+        if (!name || !capturedImage || !faceDescriptor) return setError(t('voter_register.fields_required'));
         setLoading(true);
         setError('');
 
@@ -142,17 +145,17 @@ const VoterRegister = () => {
             formData.append('photo', blob, 'voter_photo.jpg');
 
             await axios.post('http://localhost:5000/api/auth/register-voter', formData);
-            alert("Registration successful! You can now cast your vote.");
+            alert(t('voter_register.reg_success'));
             navigate('/');
         } catch (err) {
-            setError(err.response?.data?.error || "Registration failed");
+            setError(err.response?.data?.error || t('register.reg_failed'));
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-blue-50 py-12 px-4 flex items-center justify-center">
+        <div className="min-h-screen bg-blue-50 py-12 px-4 flex items-center justify-center relative">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -165,9 +168,9 @@ const VoterRegister = () => {
                         <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center text-2xl mb-6 backdrop-blur-md border border-white/20">
                             🛡️
                         </div>
-                        <h2 className="text-2xl font-black mb-4 tracking-tight">Voter <br />Enrollment</h2>
+                        <h2 className="text-2xl font-black mb-4 tracking-tight">{t('voter_register.sidebar_title')}</h2>
                         <p className="text-sm text-gray-400 font-medium leading-relaxed">
-                            Secure your digital presence. Verified via OTP and Biometric Face Recognition.
+                            {t('voter_register.sidebar_desc')}
                         </p>
                     </div>
                     <div className="relative z-10 mt-8">
@@ -177,7 +180,7 @@ const VoterRegister = () => {
                             <div className={`w-3 h-3 rounded-full ${step >= 2 ? 'bg-gov-orange' : 'bg-gray-700'}`}></div>
                         </div>
                         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                            Step {step} of 2
+                            {t('voter_register.step_info', { step })}
                         </p>
                     </div>
                 </div>
@@ -200,24 +203,24 @@ const VoterRegister = () => {
                                 className="space-y-6"
                             >
                                 <div className="space-y-1">
-                                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Full Name</label>
+                                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">{t('voter_register.full_name')}</label>
                                     <input
                                         type="text"
                                         className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold"
-                                        placeholder="Enter Full Name"
+                                        placeholder={t('voter_register.full_name')}
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
                                     />
                                 </div>
 
                                 <div className="space-y-1">
-                                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Email or Phone</label>
+                                    <label className="text-xs font-black uppercase text-gray-400 tracking-widest">{t('voter_register.email_phone')}</label>
                                     <div className="flex gap-2">
                                         <input
                                             type="text"
                                             disabled={otpSent}
                                             className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold disabled:opacity-50"
-                                            placeholder="voter@example.com"
+                                            placeholder={t('login.identifier_placeholder')}
                                             value={identifier}
                                             onChange={(e) => setIdentifier(e.target.value)}
                                         />
@@ -227,7 +230,7 @@ const VoterRegister = () => {
                                                 disabled={loading || !identifier}
                                                 className="bg-gov-blue text-white px-6 rounded-2xl font-bold hover:bg-blue-800 transition shadow-lg shadow-blue-100 disabled:opacity-50 whitespace-nowrap"
                                             >
-                                                {loading ? '...' : 'Send OTP'}
+                                                {loading ? '...' : (t('login.send_otp') || 'Send OTP')}
                                             </button>
                                         )}
                                     </div>
@@ -239,7 +242,7 @@ const VoterRegister = () => {
                                         animate={{ opacity: 1, height: 'auto' }}
                                         className="space-y-1"
                                     >
-                                        <label className="text-xs font-black uppercase text-gray-400 tracking-widest">Enter OTP</label>
+                                        <label className="text-xs font-black uppercase text-gray-400 tracking-widest">{t('voter_register.enter_otp')}</label>
                                         <div className="flex gap-2">
                                             <input
                                                 type="text"
@@ -254,10 +257,10 @@ const VoterRegister = () => {
                                                 disabled={loading || otp.length < 6}
                                                 className="bg-gov-orange text-white px-6 rounded-2xl font-bold hover:bg-orange-600 transition shadow-lg shadow-orange-100 disabled:opacity-50"
                                             >
-                                                {loading ? '...' : 'Verify'}
+                                                {loading ? '...' : t('voter_register.verify_btn')}
                                             </button>
                                         </div>
-                                        <button onClick={() => setOtpSent(false)} className="text-xs text-gov-blue font-bold hover:underline mt-2">Change details</button>
+                                        <button onClick={() => setOtpSent(false)} className="text-xs text-gov-blue font-bold hover:underline mt-2">{t('voter_register.change_details')}</button>
                                     </motion.div>
                                 )}
                             </motion.div>
@@ -281,13 +284,13 @@ const VoterRegister = () => {
                                             {!cameraReady && (
                                                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-white z-20">
                                                     <div className="w-10 h-10 border-4 border-gov-orange border-t-transparent rounded-full animate-spin mb-4"></div>
-                                                    <p className="text-sm font-bold">Activating Camera...</p>
+                                                    <p className="text-sm font-bold">{t('voter_register.activating_camera')}</p>
                                                 </div>
                                             )}
                                             <div className={`absolute inset-0 border-4 transition-colors ${faceDetected ? 'border-green-500 ring-4 ring-green-500/20' : 'border-red-500/50'}`}></div>
                                             {!modelsLoaded && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white font-bold">
-                                                    Loading Face Models...
+                                                    {t('voter_register.loading_models')}
                                                 </div>
                                             )}
                                         </>
@@ -297,11 +300,11 @@ const VoterRegister = () => {
                                 </div>
 
                                 <div className="px-4">
-                                    <h3 className="text-xl font-bold text-gray-900">Biometric Identity</h3>
+                                    <h3 className="text-xl font-bold text-gray-900">{t('voter_register.biometric_identity')}</h3>
                                     <p className="text-sm text-gray-500 mt-2">
                                         {capturedImage
-                                            ? "Photo captured successfully. Proceed to finish enrollment."
-                                            : "Position your face within the frame. Ensure good lighting."
+                                            ? t('voter_register.capture_success')
+                                            : t('voter_register.position_face')
                                         }
                                     </p>
                                 </div>
@@ -313,7 +316,7 @@ const VoterRegister = () => {
                                             disabled={!faceDetected}
                                             className="w-full py-4 bg-gov-blue text-white rounded-2xl font-bold shadow-xl hover:shadow-blue-200 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
                                         >
-                                            Capture Photo
+                                            {t('voter_register.capture_btn')}
                                         </button>
                                     ) : (
                                         <>
@@ -321,14 +324,14 @@ const VoterRegister = () => {
                                                 onClick={() => { setCapturedImage(null); setFaceDescriptor(null); }}
                                                 className="w-1/3 py-4 bg-gray-100 text-gray-600 rounded-2xl font-bold hover:bg-gray-200 transition-all"
                                             >
-                                                Retake
+                                                {t('voter_register.retake_btn')}
                                             </button>
                                             <button
                                                 onClick={handleSubmit}
                                                 disabled={loading}
                                                 className="w-2/3 py-4 bg-green-600 text-white rounded-2xl font-bold shadow-xl hover:shadow-green-200 transition-all active:scale-[0.98]"
                                             >
-                                                {loading ? 'Saving...' : 'Finish Registration'}
+                                                {loading ? t('voter_register.saving') : t('voter_register.finish_btn')}
                                             </button>
                                         </>
                                     )}

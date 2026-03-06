@@ -177,7 +177,7 @@ const AdminApplicationDetail = () => {
                     <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
                         <h3 className="text-lg font-bold mb-4">Supporting Documents</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold text-center">
-                            {['idProofUrl', 'educationCertUrl', 'incomeCertUrl', 'communityCertUrl', 'signatureUrl'].map((field) => (
+                            {['idProofUrl', 'educationCertUrl', 'signatureUrl'].map((field) => (
                                 <a
                                     key={field}
                                     href={`http://localhost:5000${app[field]}`}

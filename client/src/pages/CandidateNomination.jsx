@@ -3,9 +3,12 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as faceapi from 'face-api.js';
 import { statesAndCities, educationQualifications } from '../data/options';
+import { useTranslation } from 'react-i18next';
 
 const CandidateNomination = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const navigate = useNavigate();
     const [elections, setElections] = useState([]);
@@ -69,6 +72,20 @@ const CandidateNomination = () => {
 
     useEffect(() => {
         axios.get('http://localhost:5000/api/elections').then(res => setElections(res.data));
+
+        const loadModels = async () => {
+            const MODEL_URL = 'https://cdn.jsdelivr.net/gh/vladmandic/face-api/model/';
+            try {
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
+            } catch (err) {
+                console.error("Error loading face-api models:", err);
+            }
+        };
+        loadModels();
     }, []);
 
     // Handle Input Change
@@ -146,19 +163,34 @@ const CandidateNomination = () => {
         if (!window.confirm("Are you sure you want to submit your nomination? This action cannot be undone.")) return;
 
         setIsSubmitting(true);
-        const data = new FormData();
-
-        // Append all text fields
-        Object.keys(formData).forEach(key => {
-            data.append(key, formData[key]);
-        });
-
-        // Append all files
-        Object.keys(files).forEach(key => {
-            if (files[key]) data.append(key, files[key]);
-        });
 
         try {
+            // 1. Generate Face Descriptor from uploaded photo
+            const img = await faceapi.bufferToImage(files.photo);
+            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detection) {
+                setIsSubmitting(false);
+                return alert('No face detected in the photo. Please use a clear portrait.');
+            }
+
+            const data = new FormData();
+
+            // Append all text fields
+            Object.keys(formData).forEach(key => {
+                data.append(key, formData[key]);
+            });
+
+            // Append all files
+            Object.keys(files).forEach(key => {
+                if (files[key]) data.append(key, files[key]);
+            });
+
+            // Append face descriptor
+            data.append('faceDescriptor', JSON.stringify(Array.from(detection.descriptor)));
+
             await axios.post('http://localhost:5000/api/candidates/apply', data, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
@@ -181,30 +213,30 @@ const CandidateNomination = () => {
             case 1:
                 return (
                     <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="space-y-6">
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2">Personal Details</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2">{t('nomination.personal_details')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
-                            <Input label="Full Name" name="name" value={formData.name} onChange={handleChange} required />
+                            <Input label={t('nomination.full_name')} name="name" value={formData.name} onChange={handleChange} required />
                             <div className="grid grid-cols-2 gap-4">
-                                <Input label="Date of Birth" name="dob" type="date" value={formData.dob} onChange={handleChange} required />
-                                <Input label="Age" name="age" value={formData.age} readOnly bg="bg-gray-100" />
+                                <Input label={t('nomination.dob')} name="dob" type="date" value={formData.dob} onChange={handleChange} required />
+                                <Input label={t('nomination.age')} name="age" value={formData.age} readOnly bg="bg-gray-100" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <Select label="Gender" name="gender" value={formData.gender} onChange={handleChange} options={["Male", "Female", "Other"]} />
-                                <Select label="Blood Group" name="bloodGroup" value={formData.bloodGroup} onChange={handleChange} options={["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]} />
+                                <Select label={t('nomination.gender')} name="gender" value={formData.gender} onChange={handleChange} options={[t('nomination.male', { defaultValue: 'Male' }), t('nomination.female', { defaultValue: 'Female' }), t('nomination.other', { defaultValue: 'Other' })]} />
+                                <Select label={t('nomination.blood_group')} name="bloodGroup" value={formData.bloodGroup} onChange={handleChange} options={["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]} />
                             </div>
-                            <Input label="Mobile Number" name="mobile" value={formData.mobile} onChange={handleChange} required />
-                            <Input label="Email" name="email" value={formData.email} onChange={handleChange} required />
+                            <Input label={t('nomination.mobile')} name="mobile" value={formData.mobile} onChange={handleChange} required />
+                            <Input label={t('nomination.email')} name="email" value={formData.email} onChange={handleChange} required />
 
                             <div className="grid grid-cols-2 gap-4 md:col-span-2">
                                 <Select
-                                    label="State"
+                                    label={t('nomination.state')}
                                     name="state"
                                     value={formData.state}
                                     onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value, city: '' }))}
                                     options={Object.keys(statesAndCities)}
                                 />
                                 <Select
-                                    label="City"
+                                    label={t('nomination.city')}
                                     name="city"
                                     value={formData.city}
                                     onChange={handleChange}
@@ -213,48 +245,48 @@ const CandidateNomination = () => {
                             </div>
 
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Permanent Address (Street/Locality) <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nomination.address')} <span className="text-red-500">*</span></label>
                                 <textarea name="address" rows="3" value={formData.address} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gov-blue outline-none" required></textarea>
                             </div>
                         </div>
 
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">Family Details</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">{t('nomination.family_details')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
-                            <Input label="Father's Name" name="fatherName" value={formData.fatherName} onChange={handleChange} required />
-                            <Input label="Mother's Name" name="motherName" value={formData.motherName} onChange={handleChange} />
-                            <Input label="Spouse Name" name="spouseName" value={formData.spouseName} onChange={handleChange} />
-                            <Input label="Family Annual Income" name="familyIncome" type="number" value={formData.familyIncome} onChange={handleChange} />
+                            <Input label={t('nomination.father_name')} name="fatherName" value={formData.fatherName} onChange={handleChange} required />
+                            <Input label={t('nomination.mother_name')} name="motherName" value={formData.motherName} onChange={handleChange} />
+                            <Input label={t('nomination.spouse_name')} name="spouseName" value={formData.spouseName} onChange={handleChange} />
+                            <Input label={t('nomination.family_income')} name="familyIncome" type="number" value={formData.familyIncome} onChange={handleChange} />
                         </div>
                     </motion.div>
                 );
             case 2:
                 return (
                     <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="space-y-6">
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2">Education Details</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2">{t('nomination.education_details')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
-                            <Select label="Highest Qualification" name="qualification" value={formData.qualification} onChange={handleChange} options={educationQualifications} />
-                            <Input label="University / Board" name="university" value={formData.university} onChange={handleChange} />
+                            <Select label={t('nomination.qualification')} name="qualification" value={formData.qualification} onChange={handleChange} options={educationQualifications} />
+                            <Input label={t('nomination.university')} name="university" value={formData.university} onChange={handleChange} />
                             <div className="grid grid-cols-2 gap-4">
-                                <Input label="Passing Year" name="passingYear" value={formData.passingYear} onChange={handleChange} />
-                                <Input label="Percentage / CGPA" name="percentage" value={formData.percentage} onChange={handleChange} />
+                                <Input label={t('nomination.passing_year')} name="passingYear" value={formData.passingYear} onChange={handleChange} />
+                                <Input label={t('nomination.percentage')} name="percentage" value={formData.percentage} onChange={handleChange} />
                             </div>
                         </div>
 
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">Identity Details</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">{t('nomination.identity_details')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
-                            <Input label="Aadhaar Number" name="aadhaar" value={formData.aadhaar} onChange={handleChange} required />
-                            <Input label="Voter ID" name="voterId" value={formData.voterId} onChange={handleChange} required />
-                            <Input label="PAN Number" name="pan" value={formData.pan} onChange={handleChange} />
+                            <Input label={t('nomination.aadhaar')} name="aadhaar" value={formData.aadhaar} onChange={handleChange} required />
+                            <Input label={t('nomination.voter_id')} name="voterId" value={formData.voterId} onChange={handleChange} required />
+                            <Input label={t('nomination.pan')} name="pan" value={formData.pan} onChange={handleChange} />
                         </div>
                     </motion.div>
                 );
             case 3:
                 return (
                     <motion.div initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} className="space-y-6">
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2">Election Details</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2">{t('nomination.election_details')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Select Election <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nomination.select_election')} <span className="text-red-500">*</span></label>
                                 <select name="electionId" value={formData.electionId} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gov-blue outline-none" required>
                                     <option value="">-- Choose --</option>
                                     {elections.map(e => {
@@ -295,25 +327,25 @@ const CandidateNomination = () => {
                                     </div>
                                 )}
                             </div>
-                            <Input label="Party Name (or Independent)" name="party" value={formData.party} onChange={handleChange} required />
-                            <Input label="Constituency" name="constituency" value={formData.constituency} onChange={handleChange} />
-                            <Input label="Symbol Preference" name="symbolPreference" value={formData.symbolPreference} onChange={handleChange} />
+                            <Input label={t('nomination.party')} name="party" value={formData.party} onChange={handleChange} required />
+                            <Input label={t('nomination.constituency')} name="constituency" value={formData.constituency} onChange={handleChange} />
+                            <Input label={t('nomination.symbol_pref')} name="symbolPreference" value={formData.symbolPreference} onChange={handleChange} />
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Manifesto (Vision)</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nomination.manifesto')}</label>
                                 <textarea name="manifesto" rows="4" value={formData.manifesto} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gov-blue outline-none"></textarea>
                             </div>
                         </div>
 
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">Financial & Criminal Declaration</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">{t('nomination.declaration_header')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
-                            <Input label="Total Assets Value (₹)" name="assetsValue" type="number" value={formData.assetsValue} onChange={handleChange} required />
+                            <Input label={t('nomination.assets')} name="assetsValue" type="number" value={formData.assetsValue} onChange={handleChange} required />
                             <div className="md:col-span-2">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Criminal Record (If any, provide details. If none, type 'NO') <span className="text-red-500">*</span></label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">{t('nomination.criminal')} <span className="text-red-500">*</span></label>
                                 <textarea name="criminalRecord" rows="2" value={formData.criminalRecord} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-gov-blue outline-none" required></textarea>
                             </div>
                         </div>
 
-                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">Document Uploads</h3>
+                        <h3 className="text-xl font-bold text-gov-blue border-b pb-2 mt-8">{t('nomination.uploads_header')}</h3>
                         <div className="grid md:grid-cols-2 gap-6">
                             <FileUpload label="Candidate Photo" name="photo" onChange={handleFileChange} preview={previews.photo} required />
                             <FileUpload label="Signature" name="signature" onChange={handleFileChange} preview={previews.signature} required />
@@ -328,57 +360,56 @@ const CandidateNomination = () => {
                         <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl">
                             ✅
                         </div>
-                        <h2 className="text-3xl font-bold text-gray-800 mb-4">Review Application</h2>
+                        <h2 className="text-3xl font-bold text-gray-800 mb-4">{t('nomination.review_header')}</h2>
                         <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-                            Please review all your details carefully before submitting. Once submitted,
-                            you cannot edit your application until it is processed by the admin.
+                            {t('nomination.review_desc', { defaultValue: 'Please review all your details carefully before submitting. Once submitted, you cannot edit your application until it is processed by the admin.' })}
                         </p>
 
                         <div className="bg-gray-50 p-6 rounded-xl text-left max-w-3xl mx-auto border border-gray-200 mb-8 max-h-96 overflow-y-auto space-y-4">
                             <div>
                                 <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
-                                    <h4 className="font-bold text-gov-blue">Personal & Family</h4>
-                                    <button onClick={() => setCurrentStep(1)} className="text-sm text-gov-orange hover:underline font-semibold">Edit</button>
+                                    <h4 className="font-bold text-gov-blue">{t('nomination.personal_family')}</h4>
+                                    <button onClick={() => setCurrentStep(1)} className="text-sm text-gov-orange hover:underline font-semibold">{t('nomination.edit')}</button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                    <p><span className="font-semibold">Name:</span> {formData.name}</p>
-                                    <p><span className="font-semibold">DOB:</span> {formData.dob} ({formData.age} Yrs)</p>
-                                    <p><span className="font-semibold">Mobile:</span> {formData.mobile}</p>
-                                    <p><span className="font-semibold">Email:</span> {formData.email}</p>
-                                    <p className="col-span-2"><span className="font-semibold">Address:</span> {formData.address}</p>
-                                    <p><span className="font-semibold">Father:</span> {formData.fatherName}</p>
+                                    <p><span className="font-semibold">{t('nomination.full_name')}:</span> {formData.name}</p>
+                                    <p><span className="font-semibold">{t('nomination.dob')}:</span> {formData.dob} ({formData.age} {t('nomination.yrs')})</p>
+                                    <p><span className="font-semibold">{t('nomination.mobile')}:</span> {formData.mobile}</p>
+                                    <p><span className="font-semibold">{t('nomination.email')}:</span> {formData.email}</p>
+                                    <p className="col-span-2"><span className="font-semibold">{t('nomination.address')}:</span> {formData.address}</p>
+                                    <p><span className="font-semibold">{t('nomination.father_name')}:</span> {formData.fatherName}</p>
                                 </div>
                             </div>
 
                             <div>
                                 <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
-                                    <h4 className="font-bold text-gov-blue">Education & Identity</h4>
-                                    <button onClick={() => setCurrentStep(2)} className="text-sm text-gov-orange hover:underline font-semibold">Edit</button>
+                                    <h4 className="font-bold text-gov-blue">{t('nomination.edu_id')}</h4>
+                                    <button onClick={() => setCurrentStep(2)} className="text-sm text-gov-orange hover:underline font-semibold">{t('nomination.edit')}</button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                    <p><span className="font-semibold">Qualification:</span> {formData.qualification}</p>
-                                    <p><span className="font-semibold">Aadhaar:</span> {formData.aadhaar}</p>
-                                    <p><span className="font-semibold">Voter ID:</span> {formData.voterId}</p>
+                                    <p><span className="font-semibold">{t('nomination.qualification')}:</span> {formData.qualification}</p>
+                                    <p><span className="font-semibold">{t('nomination.aadhaar')}:</span> {formData.aadhaar}</p>
+                                    <p><span className="font-semibold">{t('nomination.voter_id')}:</span> {formData.voterId}</p>
                                 </div>
                             </div>
 
                             <div>
                                 <div className="flex justify-between items-center border-b border-gray-200 pb-1 mb-2">
-                                    <h4 className="font-bold text-gov-blue">Election & Declaration</h4>
-                                    <button onClick={() => setCurrentStep(3)} className="text-sm text-gov-orange hover:underline font-semibold">Edit</button>
+                                    <h4 className="font-bold text-gov-blue">{t('nomination.elec_decl')}</h4>
+                                    <button onClick={() => setCurrentStep(3)} className="text-sm text-gov-orange hover:underline font-semibold">{t('nomination.edit')}</button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                    <p><span className="font-semibold">Election:</span> {elections.find(e => e._id === formData.electionId)?.title || formData.electionId}</p>
-                                    <p><span className="font-semibold">Party:</span> {formData.party}</p>
-                                    <p><span className="font-semibold">Assets:</span> ₹{formData.assetsValue}</p>
-                                    <p className="col-span-2"><span className="font-semibold">Criminal Record:</span> {formData.criminalRecord}</p>
+                                    <p><span className="font-semibold">{t('nomination.select_election')}:</span> {elections.find(e => e._id === formData.electionId)?.title || formData.electionId}</p>
+                                    <p><span className="font-semibold">{t('nomination.party')}:</span> {formData.party}</p>
+                                    <p><span className="font-semibold">{t('nomination.assets')}:</span> ₹{formData.assetsValue}</p>
+                                    <p className="col-span-2"><span className="font-semibold">{t('nomination.criminal')}:</span> {formData.criminalRecord}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex items-center justify-center gap-2 mb-8">
                             <input type="checkbox" id="declare" className="w-5 h-5 text-gov-blue" />
-                            <label htmlFor="declare" className="text-sm text-gray-700">I hereby declare that all information provided is true to the best of my knowledge.</label>
+                            <label htmlFor="declare" className="text-sm text-gray-700">{t('nomination.declare_statement', { defaultValue: 'I hereby declare that all information provided is true to the best of my knowledge.' })}</label>
                         </div>
 
                         <button
@@ -386,7 +417,7 @@ const CandidateNomination = () => {
                             disabled={isSubmitting}
                             className="bg-gov-orange hover:bg-orange-600 text-white px-12 py-4 rounded-full font-bold text-lg shadow-xl transition transform hover:-translate-y-1 disabled:opacity-50"
                         >
-                            {isSubmitting ? 'Submitting...' : 'Final Submit'}
+                            {isSubmitting ? t('nomination.submitting') : t('nomination.final_submit')}
                         </button>
                     </motion.div>
                 );
@@ -401,13 +432,15 @@ const CandidateNomination = () => {
                 <div className="bg-gov-blue p-8 text-white relative overflow-hidden">
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                     <div className="relative z-10 flex justify-between items-center">
-                        <div>
-                            <h1 className="text-3xl font-bold">Candidate Nomination Form</h1>
-                            <p className="text-blue-200 mt-1">General Elections 2026</p>
+                        <div className="flex-1">
+                            <h1 className="text-3xl font-bold">{t('nomination.form_title')}</h1>
+                            <p className="text-blue-200 mt-1">{t('nomination.election_year')}</p>
                         </div>
-                        <div className="text-right hidden md:block">
-                            <p className="font-bold text-xl">Step {currentStep} of 4</p>
-                            <p className="text-sm text-blue-200">Completing Application</p>
+                        <div className="flex-row flex items-center gap-6">
+                            <div className="text-right hidden md:block border-l border-blue-400/50 pl-6">
+                                <p className="font-bold text-xl">{t('voter_register.step_info', { step: currentStep })}</p>
+                                <p className="text-sm text-blue-200">{t('nomination.completing', { defaultValue: 'Completing Application' })}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -432,13 +465,13 @@ const CandidateNomination = () => {
                             disabled={currentStep === 1}
                             className="px-6 py-2 rounded-lg font-semibold border border-gray-300 hover:bg-white transition disabled:opacity-50"
                         >
-                            &larr; Previous
+                            {t('nomination.previous')}
                         </button>
                         <button
                             onClick={nextStep}
                             className="px-8 py-2 rounded-lg font-bold bg-gov-blue text-white hover:bg-blue-800 transition shadow-lg"
                         >
-                            Save & Next &rarr;
+                            {t('nomination.save_next')} &rarr;
                         </button>
                     </div>
                 )}
@@ -448,47 +481,56 @@ const CandidateNomination = () => {
 };
 
 // Reusable Components
-const Input = ({ label, name, type = "text", value, onChange, required, readOnly, bg = "bg-white" }) => (
-    <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
-        <input
-            type={type}
-            name={name}
-            value={value}
-            onChange={onChange}
-            readOnly={readOnly}
-            className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gov-blue outline-none transition ${bg} text-gray-900`}
-            required={required}
-        />
-    </div>
-);
+const Input = ({ label, name, type = "text", value, onChange, required, readOnly, bg = "bg-white" }) => {
+    const { t } = useTranslation();
+    return (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{label} {required && <span className="text-red-500">*</span>}</label>
+            <input
+                type={type}
+                name={name}
+                value={value}
+                onChange={onChange}
+                readOnly={readOnly}
+                className={`w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gov-blue outline-none transition ${bg} text-gray-900`}
+                required={required}
+            />
+        </div>
+    );
+};
 
-const Select = ({ label, name, value, onChange, options }) => (
-    <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-        <select name={name} value={value} onChange={onChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gov-blue outline-none bg-white text-gray-900">
-            <option value="">Select</option>
-            {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-    </div>
-);
+const Select = ({ label, name, value, onChange, options }) => {
+    const { t } = useTranslation();
+    return (
+        <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+            <select name={name} value={value} onChange={onChange} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gov-blue outline-none bg-white text-gray-900">
+                <option value="">{t('nomination.select_placeholder', { defaultValue: 'Select' })}</option>
+                {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+        </div>
+    );
+};
 
-const FileUpload = ({ label, name, onChange, preview, required }) => (
-    <div className="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 text-center hover:bg-blue-50 transition">
-        <label className="cursor-pointer block">
-            <span className="block font-medium text-gray-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</span>
-            <div className="w-full h-32 bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden mb-2 mx-auto max-w-[200px]">
-                {preview ? (
-                    <img src={preview} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                    <span className="text-gray-400 text-3xl">📂</span>
-                )}
-            </div>
-            <input type="file" name={name} onChange={onChange} className="hidden" accept="image/*,.pdf" />
-            <span className="text-xs text-gov-blue font-bold">Click to Upload</span>
-        </label>
-        <p className="text-xs text-gray-400 mt-1">Max 5MB (JPG, PNG, PDF)</p>
-    </div>
-);
+const FileUpload = ({ label, name, onChange, preview, required }) => {
+    const { t } = useTranslation();
+    return (
+        <div className="border border-dashed border-gray-300 p-4 rounded-lg bg-gray-50 text-center hover:bg-blue-50 transition">
+            <label className="cursor-pointer block">
+                <span className="block font-medium text-gray-700 mb-2">{label} {required && <span className="text-red-500">*</span>}</span>
+                <div className="w-full h-32 bg-white border border-gray-200 rounded flex items-center justify-center overflow-hidden mb-2 mx-auto max-w-[200px]">
+                    {preview ? (
+                        <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                        <span className="text-gray-400 text-3xl">📂</span>
+                    )}
+                </div>
+                <input type="file" name={name} onChange={onChange} className="hidden" accept="image/*,.pdf" />
+                <span className="text-xs text-gov-blue font-bold">{t('nomination.click_upload', { defaultValue: 'Click to Upload' })}</span>
+            </label>
+            <p className="text-xs text-gray-400 mt-1">{t('nomination.upload_limits', { defaultValue: 'Max 5MB (JPG, PNG, PDF)' })}</p>
+        </div>
+    );
+};
 
 export default CandidateNomination;

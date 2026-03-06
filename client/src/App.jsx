@@ -23,6 +23,7 @@ import AdminVoters from './pages/AdminVoters';
 import CandidateLogin from './pages/CandidateLogin';
 import VoterRegister from './pages/VoterRegister';
 import NewsTicker from './components/NewsTicker';
+import SyncManager from './components/SyncManager';
 
 function App() {
   return (
@@ -36,13 +37,13 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/candidate/login" element={<CandidateLogin />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
 
 
           {/* Public Voting Routes (OTP Protected internally) */}
           <Route path="/vote/:electionId" element={<Vote />} />
-          <Route path="/results/:electionId" element={<Results />} />
 
           {/* Protected Routes for Candidates & Admins */}
           <Route element={<ProtectedRoute allowedRoles={['admin', 'candidate']} />}>
@@ -59,11 +60,13 @@ function App() {
             <Route path="/admin/news" element={<AdminNews />} />
             <Route path="/admin/create-election" element={<AdminCreateElection />} />
             <Route path="/admin/voters" element={<AdminVoters />} />
+            <Route path="/results/:electionId" element={<Results />} />
           </Route>
 
         </Routes>
       </main>
       <Chatbot />
+      <SyncManager />
     </div>
   );
 }

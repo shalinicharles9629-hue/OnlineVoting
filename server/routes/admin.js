@@ -4,6 +4,8 @@ const Candidate = require('../models/Candidate');
 const News = require('../models/News');
 const { auth, isAdmin } = require('../middleware/auth');
 const User = require('../models/User');
+const Election = require('../models/Election');
+const Vote = require('../models/Vote');
 const { sendApprovalEmail, sendRejectionEmail } = require('../utils/emailService');
 
 // isAdmin is now imported from middleware/auth.js
@@ -64,6 +66,18 @@ router.patch('/applications/:id/status', auth, isAdmin, async (req, res) => {
         if (isApproved) updateData.rejectionReason = undefined; // Clear rejection reason if approved
 
         const application = await Candidate.findByIdAndUpdate(req.params.id, updateData, { new: true });
+
+        // Sync role and photo to User profile upon approval
+        if (application && isApproved) {
+            const userUpdate = {
+                role: 'candidate',
+                photo: application.photoUrl
+            };
+            if (application.faceDescriptor && application.faceDescriptor.length > 0) {
+                userUpdate.faceDescriptor = application.faceDescriptor;
+            }
+            await User.findByIdAndUpdate(application.userId, userUpdate);
+        }
 
         // Send email notification
         if (application) {
@@ -184,10 +198,59 @@ router.post('/voters', auth, isAdmin, upload.single('photo'), async (req, res) =
 // GET /voters: Fetch all registered voters
 router.get('/voters', auth, isAdmin, async (req, res) => {
     try {
-        const voters = await User.find({ role: 'voter' }).select('-password').sort({ createdAt: -1 });
-        res.json(voters);
+        const voters = await User.find({ role: { $in: ['voter', 'candidate'] } }).select('-password').sort({ createdAt: -1 }).lean();
+
+        // Find the most relevant election to check voting status
+        // Prioritize 'ongoing', fallback to most recently created
+        let relevantElection = await Election.findOne({ status: 'ongoing' }).sort({ createdAt: -1 });
+        if (!relevantElection) {
+            relevantElection = await Election.findOne().sort({ createdAt: -1 });
+        }
+
+        if (relevantElection) {
+            // Get all votes for this election and normalize identifiers
+            const votes = await Vote.find({ electionId: relevantElection._id }).select('voterIdentifier');
+            const votedIdentifiers = new Set(votes.map(v => v.voterIdentifier.toLowerCase()));
+
+            // Map hasVoted status to each voter
+            const votersWithStatus = voters.map(voter => {
+                const email = voter.email ? voter.email.toLowerCase() : null;
+                const phone = voter.phone; // Phone numbers usually don't have case issues
+                return {
+                    ...voter,
+                    hasVoted: (email && votedIdentifiers.has(email)) || (phone && votedIdentifiers.has(phone))
+                };
+            });
+            return res.json(votersWithStatus);
+        }
+
+        res.json(voters.map(v => ({ ...v, hasVoted: false })));
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// PATCH /voters/:id/biometrics: Update biometrics for an existing voter
+router.patch('/voters/:id/biometrics', auth, isAdmin, async (req, res) => {
+    try {
+        const { faceDescriptor } = req.body;
+        if (!faceDescriptor) {
+            return res.status(400).json({ error: 'Face descriptor is required.' });
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.params.id,
+            { faceDescriptor: JSON.parse(faceDescriptor) },
+            { new: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: 'Voter not found' });
+        }
+
+        res.json(user);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
 });
 

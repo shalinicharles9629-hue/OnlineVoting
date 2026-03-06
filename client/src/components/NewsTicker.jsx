@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useTranslation } from 'react-i18next';
 
 const NewsTicker = () => {
+  const { t } = useTranslation();
   const [news, setNews] = useState([]);
 
   useEffect(() => {
@@ -17,9 +19,9 @@ const NewsTicker = () => {
   }, []);
 
   return (
-    <div className="bg-gov-blue text-white py-1.5 overflow-hidden relative border-y border-white/10 h-10 flex items-center">
+    <div className="bg-gov-blue text-white py-1.5 overflow-hidden relative border-y border-white/10 h-10 flex items-center z-40">
       <div className="absolute left-0 top-0 bottom-0 bg-gov-orange px-3 z-10 flex items-center font-bold text-xs shadow-lg uppercase tracking-wider">
-        Latest News
+        {t('news_ticker.label')}
       </div>
       <div className="whitespace-nowrap animate-marquee flex gap-10 items-center">
         {news.length > 0 ? (
@@ -31,12 +33,12 @@ const NewsTicker = () => {
           ))
         ) : (
           <>
-            <span>📢 General Elections 2026 dates announced! Voting starts April 1st.</span>
-            <span>📢 Candidate Registration closes on March 15th. Apply now!</span>
-            <span>📢 Check your Voter ID status in the dashboard.</span>
+            <span>📢 {t('news_ticker.news1')}</span>
+            <span>📢 {t('news_ticker.news2')}</span>
+            <span>📢 {t('news_ticker.news3')}</span>
             {/* Repeat for continuous feel */}
-            <span>📢 General Elections 2026 dates announced! Voting starts April 1st.</span>
-            <span>📢 Candidate Registration closes on March 15th. Apply now!</span>
+            <span>📢 {t('news_ticker.news1')}</span>
+            <span>📢 {t('news_ticker.news2')}</span>
           </>
         )}
       </div>

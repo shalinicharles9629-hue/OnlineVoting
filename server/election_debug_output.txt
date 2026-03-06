@@ -1,0 +1,7 @@
+Found 1 elections.
+ID: 6994d2951a8075576b36537d
+Title: General Election 2026
+Status: ongoing
+showLiveResults: false
+resultsPublished: false
+----------------

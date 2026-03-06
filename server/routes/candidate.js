@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Candidate = require('../models/Candidate');
 const Election = require('../models/Election');
+const User = require('../models/User'); // Import User model
 const { auth } = require('../middleware/auth');
 const multer = require('multer');
 
@@ -101,10 +102,23 @@ router.post('/apply', auth, uploadFields, async (req, res) => {
             idProofUrl: getFilePath('idProof'),
             educationCertUrl: getFilePath('educationCert'),
             incomeCertUrl: getFilePath('incomeCert'),
-            communityCertUrl: getFilePath('communityCert')
+            communityCertUrl: getFilePath('communityCert'),
+            faceDescriptor: req.body.faceDescriptor ? JSON.parse(req.body.faceDescriptor) : []
         });
 
         await candidate.save();
+
+        // Sync photo and biometrics to User profile immediately
+        const userUpdate = {};
+        if (candidate.photoUrl) userUpdate.photo = candidate.photoUrl;
+        if (candidate.faceDescriptor && candidate.faceDescriptor.length > 0) {
+            userUpdate.faceDescriptor = candidate.faceDescriptor;
+        }
+
+        if (Object.keys(userUpdate).length > 0) {
+            await User.findByIdAndUpdate(req.user._id, userUpdate);
+        }
+
         res.status(201).json(candidate);
     } catch (error) {
         console.error("Error saving candidate:", error);

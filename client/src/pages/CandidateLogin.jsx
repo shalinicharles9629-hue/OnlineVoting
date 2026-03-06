@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 const CandidateLogin = () => {
+    const { t } = useTranslation();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { login } = useAuth();
@@ -16,12 +18,12 @@ const CandidateLogin = () => {
         try {
             const res = await login(email, password);
             if (res.user.role !== 'candidate') {
-                setError('Access denied. This portal is for election candidates only.');
+                setError(t('candidate_login.access_denied'));
                 return;
             }
             navigate('/dashboard');
         } catch (err) {
-            setError('Invalid credentials');
+            setError(t('login.invalid_credentials', { defaultValue: 'Invalid credentials' }));
         }
     };
 
@@ -41,9 +43,9 @@ const CandidateLogin = () => {
                             <span className="text-6xl">🤝</span>
                         </div>
                     </motion.div>
-                    <h2 className="text-4xl font-bold mb-4">Candidate Portal</h2>
+                    <h2 className="text-4xl font-bold mb-4">{t('candidate_login.portal_title')}</h2>
                     <p className="text-orange-100 text-lg">
-                        Manage your nomination, view constituency stats, and track election progress.
+                        {t('candidate_login.portal_desc')}
                     </p>
                 </div>
             </div>
@@ -57,8 +59,8 @@ const CandidateLogin = () => {
                     className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md border border-gray-100"
                 >
                     <div className="text-center mb-8">
-                        <h2 className="text-3xl font-bold text-gray-800">Candidate Login</h2>
-                        <p className="text-gray-500 mt-2">Enter your nominee credentials</p>
+                        <h2 className="text-3xl font-bold text-gray-800">{t('candidate_login.title')}</h2>
+                        <p className="text-gray-500 mt-2">{t('candidate_login.subtitle')}</p>
                     </div>
 
                     {error && (
@@ -69,7 +71,7 @@ const CandidateLogin = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Registered Email</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t('candidate_login.email_label')}</label>
                             <div className="relative">
                                 <span className="absolute left-3 top-3 text-gray-400">✉️</span>
                                 <input
@@ -84,7 +86,7 @@ const CandidateLogin = () => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">{t('candidate_login.password_label')}</label>
                             <div className="relative">
                                 <span className="absolute left-3 top-3 text-gray-400">🔒</span>
                                 <input
@@ -102,17 +104,17 @@ const CandidateLogin = () => {
                             type="submit"
                             className="w-full bg-gov-orange hover:bg-orange-700 text-white font-bold py-3 rounded-lg shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5"
                         >
-                            Access Candidate Dashboard
+                            {t('candidate_login.login_btn')}
                         </button>
                     </form>
 
                     <p className="mt-8 text-center text-sm text-gray-600">
-                        Not a candidate yet?{' '}
+                        {t('candidate_login.not_candidate')}{' '}
                         <Link to="/register" className="font-semibold text-gov-orange hover:text-orange-700 transition">
-                            Apply via Registration
+                            {t('candidate_login.apply_link')}
                         </Link>
                     </p>
-                    <Link to="/" className="block mt-4 text-center text-xs text-gov-blue hover:underline">Back to Home</Link>
+                    <Link to="/" className="block mt-4 text-center text-xs text-gov-blue hover:underline">{t('admin_login.back_home')}</Link>
                 </motion.div>
             </div>
         </div>

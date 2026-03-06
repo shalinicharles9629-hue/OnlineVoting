@@ -17,9 +17,9 @@ router.post('/send-otp', async (req, res) => {
     try {
         const { identifier, electionId } = req.body; // Email or Phone
 
-        // Check if user is registered as a voter
+        // Check if user is registered as a voter or candidate
         const user = await User.findOne({ $or: [{ email: identifier }, { phone: identifier }] });
-        if (!user || user.role !== 'voter') {
+        if (!user || (user.role !== 'voter' && user.role !== 'candidate')) {
             return res.status(404).json({ message: 'Voter not found in registry. Please contact the Election Commission or your administrator.' });
         }
 
@@ -144,33 +144,42 @@ router.get('/results/:electionId', async (req, res) => {
         if (token) {
             try {
                 const decoded = jwt.verify(token, process.env.JWT_SECRET);
-                const user = await User.findById(decoded.id);
+                const user = await User.findById(decoded._id);
                 isAdmin = user?.role === 'admin';
             } catch (err) {
                 // Token invalid or expired, treat as non-admin
             }
         }
 
-        // Access Control:
-        // 1. Admin: Always can view (implicit in isAdmin check above)
-        // 2. Published: Everyone can view
-        // 3. Ongoing + showLiveResults: Public can view live trends
-        const canView = isAdmin || election.resultsPublished || (election.status === 'ongoing' && election.showLiveResults);
+        // Total votes are ALWAYS visible to everyone (per requirement)
+        const totalVotes = await Vote.countDocuments({ electionId: new mongoose.Types.ObjectId(electionId) });
 
-        if (!canView) {
+        // Determine if user can view detailed candidate-wise breakdown
+        // 1. User is Admin
+        // 2. Election is ended AND results are published
+        // 3. Election is ongoing AND admin has enabled live trends (showLiveResults)
+        const canViewDetails = isAdmin ||
+            (election.status === 'ended' && election.resultsPublished) ||
+            (election.status === 'ongoing' && election.showLiveResults);
+
+        if (!canViewDetails) {
             return res.json({
-                published: false,
+                published: election.resultsPublished,
                 election: {
                     title: election.title,
                     status: election.status,
-                    resultsPublished: election.resultsPublished
+                    resultsPublished: election.resultsPublished,
+                    showLiveResults: election.showLiveResults
                 },
                 results: [],
-                message: 'Results will be released after admin approval.'
+                totalVotes,
+                message: election.status === 'ended'
+                    ? 'Election has ended. Official results will be published shortly.'
+                    : 'Detailed live trends are currently private.'
             });
         }
 
-        // Aggregation to count votes per candidate
+        // Aggregation for detailed results
         const results = await Vote.aggregate([
             { $match: { electionId: new mongoose.Types.ObjectId(electionId) } },
             { $group: { _id: '$candidateId', count: { $sum: 1 } } },
@@ -196,9 +205,11 @@ router.get('/results/:electionId', async (req, res) => {
             election: {
                 title: election.title,
                 status: election.status,
-                resultsPublished: election.resultsPublished
+                resultsPublished: election.resultsPublished,
+                showLiveResults: election.showLiveResults
             },
-            results
+            results,
+            totalVotes
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

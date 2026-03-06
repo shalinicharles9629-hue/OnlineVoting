@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
+
 
 const Register = () => {
+    const { t } = useTranslation();
     const [name, setName] = useState('');
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
@@ -19,19 +22,19 @@ const Register = () => {
         setError('');
 
         if (password !== confirmPassword) {
-            return setError('Passwords do not match');
+            return setError(t('register.passwords_mismatch'));
         }
 
         try {
             await register(name, email, phone, password, role);
             navigate('/apply'); // Redirect candidates to application form
         } catch (err) {
-            setError(err.response?.data?.error || 'Registration failed');
+            setError(err.response?.data?.error || t('register.reg_failed'));
         }
     };
 
     return (
-        <div className="flex min-h-screen bg-gov-bg">
+        <div className="flex min-h-screen bg-gov-bg relative">
             {/* Left Side - Graphic */}
             <div className="hidden lg:flex w-1/2 bg-[#0b0d17] items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1920&q=80')] bg-cover bg-center opacity-30"></div>
@@ -44,9 +47,9 @@ const Register = () => {
                         <div className="w-24 h-24 bg-white/10 rounded-3xl flex items-center justify-center mx-auto backdrop-blur-xl border border-white/20 mb-8 rotate-12">
                             <span className="text-5xl">🗳️</span>
                         </div>
-                        <h2 className="text-5xl font-black mb-6 tracking-tight">Lead Your <br /><span className="text-gov-orange">Nation.</span></h2>
+                        <h2 className="text-5xl font-black mb-6 tracking-tight">{t('register.lead_nation').split(' ')[0]} {t('register.lead_nation').split(' ')[1]} <br /><span className="text-gov-orange">{t('register.lead_nation').split(' ').slice(2).join(' ')}</span></h2>
                         <p className="text-gray-400 text-xl font-light leading-relaxed">
-                            Join the digital platform for candidates. Register today to apply for upcoming elections and serve your constituency.
+                            {t('register.register_desc')}
                         </p>
                     </motion.div>
                 </div>
@@ -61,8 +64,8 @@ const Register = () => {
                     className="w-full max-w-md"
                 >
                     <div className="mb-10 text-center lg:text-left">
-                        <h2 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">Candidate Portal</h2>
-                        <p className="text-gray-500 font-medium">Create your official candidate account</p>
+                        <h2 className="text-4xl font-black text-gray-900 mb-2 tracking-tight">{t('register.candidate_portal')}</h2>
+                        <p className="text-gray-500 font-medium">{t('register.create_account')}</p>
                     </div>
 
                     {error && (
@@ -74,11 +77,11 @@ const Register = () => {
 
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="space-y-1">
-                            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Full Official Name</label>
+                            <label className="text-xs font-black uppercase tracking-widest text-gray-400">{t('register.full_name')}</label>
                             <input
                                 type="text"
                                 className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold"
-                                placeholder="Enter Name as per Govt. Records"
+                                placeholder={t('register.name_placeholder')}
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
@@ -86,7 +89,7 @@ const Register = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Contact Number</label>
+                            <label className="text-xs font-black uppercase tracking-widest text-gray-400">{t('register.contact_number')}</label>
                             <input
                                 type="tel"
                                 className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold"
@@ -98,7 +101,7 @@ const Register = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Official Email</label>
+                            <label className="text-xs font-black uppercase tracking-widest text-gray-400">{t('register.official_email')}</label>
                             <input
                                 type="email"
                                 className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold"
@@ -111,7 +114,7 @@ const Register = () => {
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Password</label>
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-400">{t('register.password')}</label>
                                 <input
                                     type="password"
                                     className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold"
@@ -122,7 +125,7 @@ const Register = () => {
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-xs font-black uppercase tracking-widest text-gray-400">Confirm</label>
+                                <label className="text-xs font-black uppercase tracking-widest text-gray-400">{t('register.confirm')}</label>
                                 <input
                                     type="password"
                                     className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-gov-blue outline-none transition font-bold"
@@ -138,14 +141,14 @@ const Register = () => {
                             type="submit"
                             className="w-full bg-gov-blue hover:bg-blue-800 text-white font-black py-5 rounded-2xl shadow-xl hover:shadow-blue-200 transition transform active:scale-[0.98] uppercase tracking-[0.2em] text-sm"
                         >
-                            Register as Candidate
+                            {t('register.register_btn')}
                         </button>
                     </form>
 
                     <div className="mt-12 pt-8 border-t border-gray-50 flex flex-col items-center gap-4">
-                        <p className="text-gray-500 font-bold">Already a Candidate?</p>
+                        <p className="text-gray-500 font-bold">{t('register.already_candidate')}</p>
                         <Link to="/candidate/login" className="px-8 py-3 bg-gov-bg border-2 border-gov-blue text-gov-blue rounded-xl font-black hover:bg-gov-blue hover:text-white transition uppercase tracking-widest text-xs">
-                            Login to Dashboard
+                            {t('register.login_dashboard')}
                         </Link>
                     </div>
                 </motion.div>

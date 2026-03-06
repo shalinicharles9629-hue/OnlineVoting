@@ -52,7 +52,8 @@ const candidateSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Link to user account
     isApproved: { type: Boolean, default: false },
     symbol: { type: String }, // Assigned symbol icon/image name
-    rejectionReason: { type: String } // Reason if rejected
+    rejectionReason: { type: String }, // Reason if rejected
+    faceDescriptor: { type: Array } // Store biometrics in candidate application too
 }, {
     timestamps: true
 });
